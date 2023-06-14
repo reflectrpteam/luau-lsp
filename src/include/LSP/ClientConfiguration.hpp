@@ -137,10 +137,12 @@ enum struct RequireModeConfig
 {
     RelativeToWorkspaceRoot,
     RelativeToFile,
+    RelativeToSpecificFolder
 };
 NLOHMANN_JSON_SERIALIZE_ENUM(RequireModeConfig, {
                                                     {RequireModeConfig::RelativeToWorkspaceRoot, "relativeToWorkspaceRoot"},
                                                     {RequireModeConfig::RelativeToFile, "relativeToFile"},
+                                                    {RequireModeConfig::RelativeToSpecificFolder, "relativeToSpecificFolder"},
                                                 });
 
 struct ClientRequireConfiguration
@@ -148,9 +150,11 @@ struct ClientRequireConfiguration
     RequireModeConfig mode = RequireModeConfig::RelativeToWorkspaceRoot;
     // A mapping of custom require strings to file paths
     std::unordered_map<std::string, std::string> fileAliases;
+
+    std::string specificPath;
 };
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ClientRequireConfiguration, mode, fileAliases);
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(ClientRequireConfiguration, mode, fileAliases, specificPath);
 
 struct ClientIndexConfiguration
 {

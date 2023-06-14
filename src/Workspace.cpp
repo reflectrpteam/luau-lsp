@@ -3,6 +3,10 @@
 #include <iostream>
 #include <climits>
 
+// <<< RRP
+#include <pugixml.hpp>
+// RRP >>>
+
 #include "glob/glob.hpp"
 #include "Luau/BuiltinDefinitions.h"
 #include "LSP/LuauExt.hpp"
@@ -142,6 +146,136 @@ void WorkspaceFolder::indexFiles(const ClientConfiguration& config)
     }
 }
 
+// <<< MTA
+void WorkspaceFolder::indexMTAFiles()
+{
+    if (isNullWorkspace())
+        return;
+
+    const auto parseMeta = [&](const std::filesystem::path& path) -> bool
+    {
+        pugi::xml_document doc;
+        pugi::xml_parse_result result = doc.load_file(path.c_str());
+
+        if (!result)
+        {
+            client->sendWindowMessage(lsp::MessageType::Error,
+                "Failed to read MTA meta file " + path.string() + ". XML file parse error");
+            return false;
+        }
+
+        auto meta = doc.child("meta");
+        if (!meta)
+        {
+            client->sendWindowMessage(lsp::MessageType::Error,
+                "Failed to read MTA meta file " + path.string() + ". Cannot find a valid root node");
+            return false;
+        }
+
+        std::shared_ptr<Luau::MTAMetaDescription> desc = std::make_shared<Luau::MTAMetaDescription>();
+
+        for (pugi::xml_node script = meta.child("script"); script; script = script.next_sibling("script"))
+        {
+            Luau::MTAScriptType scriptType{ Luau::MTAScriptType::Server };
+            if (auto type = script.attribute("type"))
+            {
+                if (std::strcmp(type.value(), "server") == 0)
+                    scriptType = Luau::MTAScriptType::Server;
+                else if (std::strcmp(type.value(), "client") == 0)
+                    scriptType = Luau::MTAScriptType::Client;
+                else if (std::strcmp(type.value(), "shared") == 0)
+                    scriptType = Luau::MTAScriptType::Shared;
+                else
+                    client->sendWindowMessage(lsp::MessageType::Warning,
+                        "Invalid script type specified. See " + path.string());
+            }
+
+            if (auto src = script.attribute("src"))
+            {
+                auto scriptPath = path.parent_path() / src.value();
+                auto scriptModuleName = Uri::parse(Uri::file(scriptPath).toString()).fsPath().generic_string();
+    
+                desc->files.push_back({scriptType, scriptModuleName});
+
+                frontend.scriptFiles[scriptModuleName] = std::make_pair(desc, scriptType);
+            }
+            else
+                client->sendWindowMessage(lsp::MessageType::Warning,
+                        "Script name is not specified. See " + path.string());
+        }
+
+        return true;
+    };
+
+    for (std::filesystem::recursive_directory_iterator next(rootUri.fsPath()), end; next != end; ++next)
+    {
+        if (!next->is_regular_file() || !next->path().has_filename())
+            continue;
+
+        const auto filename = next->path().filename();
+        if (filename == "meta.xml")
+            parseMeta(next->path());
+    }
+
+    /*
+    
+    */
+    frontend.clear();
+    instanceTypes.clear();
+
+    // Prepare module scope so that we can dynamically reassign the type of "script" to retrieve instance info
+    frontend.prepareModuleScope = [this](const Luau::ModuleName& name, const Luau::ScopePtr& scope, bool forAutocomplete)
+    {
+        auto& resolver = forAutocomplete ? frontend.moduleResolverForAutocomplete : frontend.moduleResolver;
+        
+// <<< RRP
+        // Process includes
+        {
+            Luau::SourceModule* modulePtr = frontend.getSourceModule(name);
+            if (!modulePtr)
+                return;       
+
+            if (auto foundTrace = frontend.requireTrace.find(name); foundTrace != frontend.requireTrace.end())
+            {
+                Luau::RequireTraceResult& traceResult = foundTrace->second;
+
+                for (const auto& [includeName, location, typeName] : traceResult.requireList)
+                {
+                    if (typeName == "require")
+                        continue;
+
+                    auto includeModule = resolver.getModule(includeName);
+                    if (includeModule)
+                        frontend.copyGlobalsFromModule(includeModule, scope, forAutocomplete); 
+                }
+            }  
+        }
+// RRP >>>
+
+        // Process shared scripts from meta
+        {
+            auto found = frontend.scriptFiles.find(name);
+            if (found == frontend.scriptFiles.end())
+                return;
+
+            const auto& [meta, type] = found->second;
+            if (!meta)
+                return;
+
+            for (const auto& entry : meta->files)
+            {
+                auto includeModule = resolver.getModule(entry.name);
+                if (!includeModule)
+                    continue;
+
+                if (entry.name != name && IsMTAScriptTypeMatched(type, entry.type))
+                    frontend.copyGlobalsFromModule(includeModule, scope, forAutocomplete);
+            }
+        }
+    };
+}
+// MTA >>>
+
 bool WorkspaceFolder::updateSourceMap()
 {
     auto sourcemapPath = rootUri.fsPath() / "sourcemap.json";
@@ -242,4 +376,8 @@ void WorkspaceFolder::setupWithConfiguration(const ClientConfiguration& configur
 
     if (configuration.index.enabled)
         indexFiles(configuration);
+
+// <<< MTA
+    indexMTAFiles(); 
+// MTA >>>
 }

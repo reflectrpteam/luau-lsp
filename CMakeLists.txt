@@ -8,6 +8,7 @@ add_executable(Luau.LanguageServer.CLI)
 add_executable(Luau.LanguageServer.Test)
 
 target_sources(Luau.LanguageServer PRIVATE
+    extern/pugixml/src/pugixml.cpp
     src/LanguageServer.cpp
     src/JsonRpc.cpp
     src/Uri.cpp
@@ -66,7 +67,7 @@ else()
     list(APPEND LUAU_LSP_OPTIONS -Wall -Werror)
 endif()
 
-set(EXTERN_INCLUDES extern/json/include extern/glob/single_include)
+set(EXTERN_INCLUDES extern/json/include extern/glob/single_include extern/pugixml/src)
 
 target_compile_features(Luau.LanguageServer PUBLIC cxx_std_17)
 target_compile_options(Luau.LanguageServer PRIVATE ${LUAU_LSP_OPTIONS})

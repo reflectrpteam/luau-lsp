@@ -63,6 +63,10 @@ public:
 
     void indexFiles(const ClientConfiguration& config);
 
+// <<< MTA
+    void indexMTAFiles();
+// MTA >>>
+
 private:
     void endAutocompletion(const lsp::CompletionParams& params);
     void suggestImports(const Luau::ModuleName& moduleName, const Luau::Position& position, const ClientConfiguration& config,

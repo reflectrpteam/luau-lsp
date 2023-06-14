@@ -372,12 +372,20 @@
           "default": "relativeToWorkspaceRoot",
           "enum": [
             "relativeToWorkspaceRoot",
-            "relativeToFile"
+            "relativeToFile",
+            "relativeToSpecificFolder"
           ],
           "enumDescriptions": [
             "String requires are interpreted relative to the root of the workspace",
-            "String requires are interpreted relative to the current file"
+            "String requires are interpreted relative to the current file",
+            "String requires are interpreted relative to the specific folder"
           ]
+        },
+        "luau-lsp.require.specificPath": {
+          "markdownDescription": "Path to the specific folder that will be used as a base for requires.",
+          "type": "string",
+          "default": null,
+          "scope": "resource"
         },
         "luau-lsp.require.fileAliases": {
           "markdownDescription": "A mapping of custom require string aliases to file paths",

@@ -216,6 +216,21 @@ std::filesystem::path WorkspaceFileResolver::getRequireBasePath(std::optional<Lu
             return rootUri.fsPath();
         }
     }
+// <<< MTA
+    case RequireModeConfig::RelativeToSpecificFolder:
+    {
+        if (fileModuleName.has_value() && !config.require.specificPath.empty())
+        {
+            auto filePath = resolveToRealPath(*fileModuleName);
+            if (filePath)
+            {
+                auto specificPath = rootUri.fsPath() / config.require.specificPath;
+                if (std::filesystem::is_directory(specificPath))
+                    return specificPath;
+            }   
+        }
+    }
+// MTA >>>
     }
 
     return rootUri.fsPath();
@@ -227,6 +242,10 @@ std::optional<Luau::ModuleInfo> WorkspaceFileResolver::resolveModule(const Luau:
     if (auto* expr = node->as<Luau::AstExprConstantString>())
     {
         std::string requiredString(expr->value.data, expr->value.size);
+
+// <<< RRP
+        std::replace(requiredString.begin(), requiredString.end(), '.', '/');
+// RRP >>>
 
         // Check for custom require overrides
         if (client)
